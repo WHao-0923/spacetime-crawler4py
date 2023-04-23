@@ -17,7 +17,14 @@ def extract_next_links(url, resp):
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     soup = BeautifulSoup(resp.raw_response, "html.parser")
-    links = soup.find_all("a")
+    links = []
+    for link in soup.find_all('a'):
+        href = link.get('href')
+        if href:
+            parsed_href = urlparse(href)
+            # Check if the URL is valid
+            if parsed_href.scheme and parsed_href.netloc:
+                links.append(href)
     return links
 
 def is_valid(url):
