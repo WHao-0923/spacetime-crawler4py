@@ -26,15 +26,21 @@ def extract_next_links(url, resp):
     # Detect and avoid dead URLs that return a 200 status but no data (click here to see what the different HTTP status codes mean Links to an external site.)
     # Detect and avoid crawling very large files, especially if they have low information value
     
-    soup = BeautifulSoup(resp.raw_response, "html.parser")
+    soup = BeautifulSoup(resp.raw_response.content, "html.parser")
     links = []
     for link in soup.find_all('a'):
         href = link.get('href')
-        if href:
+        #print(is_valid(href))
+        #print("ori: ",href)
+        if href and is_valid(href):
             parsed_href = urlparse(href)
+            #print("parsed: ",parsed_href)
             # Check if the URL is valid
-            if parsed_href.scheme and parsed_href.netloc:
+            #print(parsed_href.scheme, parsed_href.netloc)
+            ori_parsed = urlparse(url)
+            if parsed_href.scheme and parsed_href.netloc == ori_parsed.netloc:
                 links.append(href)
+    #print(links)
     return links
 
 def is_valid(url):
