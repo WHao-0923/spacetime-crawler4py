@@ -1,6 +1,9 @@
-import re
+import re, time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup 
+MIN_CONTENT_LENGTH = 500
+MAX_CONTENT_LENGTH = 100000
+
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -26,6 +29,20 @@ def extract_next_links(url, resp):
     # Detect and avoid dead URLs that return a 200 status but no data (click here to see what the different HTTP status codes mean Links to an external site.)
     # Detect and avoid crawling very large files, especially if they have low information value
     
+    time.sleep(0.5)
+
+    # Check if the response status is 200 (OK)
+    if resp.status != 200:
+        return []
+
+    # Check the content length before processing the URL
+    if len(resp.raw_response.content) < MIN_CONTENT_LENGTH:
+        return []
+
+    # Check the content length before processing the URL
+    if len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
+        return []
+
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
     links = []
     for link in soup.find_all('a'):
@@ -37,10 +54,13 @@ def extract_next_links(url, resp):
             #print("parsed: ",parsed_href)
             # Check if the URL is valid
             #print(parsed_href.scheme, parsed_href.netloc)
-            ori_parsed = urlparse(url)
-            if parsed_href.scheme and parsed_href.netloc == ori_parsed.netloc:
+            ori_parsed = urlparse(url)._replace(fragment='')
+            #print(ori_parsed.geturl())
+            #print(ori_parsed.netloc)
+            if parsed_href.scheme and parsed_href.netloc == ori_parsed.netloc :
                 links.append(href)
     #print(links)
+    exit()
     return links
 
 def is_valid(url):
