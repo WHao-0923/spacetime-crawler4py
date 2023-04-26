@@ -67,9 +67,11 @@ def extract_next_links(url, resp):
 
             # Normalize the URL by removing the trailing slash
             abs_url = abs_url.rstrip('/')
+            print(abs_url)
+            
 
             # Check if the absolute URL has the same domain as the base URL
-            if urlparse(abs_url).netloc == urlparse(url).netloc:
+            if (urlparse(abs_url).netloc).endswith(urlparse(url).netloc[3:]):
 
                 # Check if the absolute URL is not a duplicate and has not been crawled already
                 if abs_url not in dup:
@@ -78,7 +80,7 @@ def extract_next_links(url, resp):
                     # Add the absolute URL to the sets of unique URLs and crawled URLs
                     dup.add(abs_url)
     
-
+    print(len(dup))
     print('\n'.join(dup))
     print(len(dup))
     exit()
