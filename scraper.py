@@ -4,6 +4,10 @@ from bs4 import BeautifulSoup
 
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
+dup = list()
+
+OK_counter = 0
+NotOK_counter = 0
 
 
 def scraper(url, resp):
@@ -33,16 +37,21 @@ def extract_next_links(url, resp):
 
     # Check if the response status is 200 (OK)
     if resp.status != 200:
-        print("response status OK with code:", resp.status)
+        global NotOK_counter
+        NotOK_counter += 1
+        print("number of page crawed that is bad: ", NotOK_counter)
         return []
+    else:
+        global OK_counter 
+        OK_counter += 1
+        print("number of page crawed that is ok: ", OK_counter)
 
     # Check if the content length is within the desired range
     if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
         return []
 
     # Initialize a set to store unique URLs
-    dup = set()
-    dup.add(url)
+    dup.append(url)
 
     # Use BeautifulSoup to parse the HTML content
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
@@ -60,30 +69,28 @@ def extract_next_links(url, resp):
         if href:
             # Use urljoin to combine the base URL and the relative URL
             abs_url = urljoin(url, href)
-
+            
             # Remove any URL fragment if present
             if "#" in abs_url:
                 abs_url = abs_url.split('#')[0]
 
             # Normalize the URL by removing the trailing slash
             abs_url = abs_url.rstrip('/')
-            print(abs_url)
-            
 
+            
             # Check if the absolute URL has the same domain as the base URL
             if (urlparse(abs_url).netloc).endswith(urlparse(url).netloc[3:]):
 
                 # Check if the absolute URL is not a duplicate and has not been crawled already
-                if abs_url not in dup:
+                if abs_url not in set(dup):
                     # Append the absolute URL to the list of extracted links
                     links.append(abs_url)
                     # Add the absolute URL to the sets of unique URLs and crawled URLs
-                    dup.add(abs_url)
+                    dup.append(abs_url)
     
-    print(len(dup))
-    print('\n'.join(dup))
-    print(len(dup))
-    exit()
+    #print(len(dup))
+    #print('\n'.join(dup))
+    #exit()
 
     # Return the list of extracted links
     return links
@@ -109,3 +116,11 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+
+
+#redirect is in a library? #hints
+#http and https are consider same websites?
+#how do we know if the parsed url is a valid status (how do we know if that website has status 200 since we can't get into the url we get directly)
+#similarity check. Do we check the content (tokens) of a website to see if there is minor difference between the previous tokens?
+#if a page is found under any 4 of the domain, it will be added to the lsit, for example if in stat, page containing ics.uci.edu will be added?
