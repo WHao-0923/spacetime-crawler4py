@@ -1,11 +1,11 @@
 import re, time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup 
-import time
 
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
-crawled = set()
+
+
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
@@ -23,71 +23,67 @@ def extract_next_links(url, resp):
     
     # Correctness:
     # Honor the politeness delay for each site - 0.5s
-    # Crawl all pages with high textual information content - #
-    # Detect and avoid infinite traps - #
-    # Detect and avoid sets of similar pages with no information - /#
-    # Detect redirects and if the page redirects your crawler, index the redirected content - /#
-    # Detect and avoid dead URLs that return a 200 status but no data - /#
-    # Detect and avoid crawling very large files, especially if they have low information value -/#
-    # Make sure to add relative links to current and return - #
-    # time.sleep(0.5) // Already use politeness in config
-
-    # if (resp.status >= 400 or resp.status == 204):
-    #     
-    #     return list()
+    # Crawl all pages with high textual information content
+    # Detect and avoid infinite traps
+    # Detect and avoid sets of similar pages with no information
+    # Detect redirects and if the page redirects your crawler, index the redirected content
+    # Detect and avoid dead URLs that return a 200 status but no data (click here to see what the different HTTP status codes mean Links to an external site.)
+    # Detect and avoid crawling very large files, especially if they have low information value
+    
 
     # Check if the response status is 200 (OK)
     if resp.status != 200:
-        print(1)
+        print("response status OK with code:", resp.status)
         return []
 
-    # Check the content length before processing the URL
-    if len(resp.raw_response.content) < MIN_CONTENT_LENGTH:
-        print(2)
+    # Check if the content length is within the desired range
+    if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
         return []
 
-    # Check the content length before processing the URL
-    if len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
-        print(3)
-        return []
+    # Initialize a set to store unique URLs
+    dup = set()
+    dup.add(url)
 
-    # check duplicates/infinite loop
-    dup = set(url)
-
+    # Use BeautifulSoup to parse the HTML content
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+
+    # Initialize an empty list to store the extracted links
     links = []
+
+    # Iterate over all 'a' tags in the HTML content
     for link in soup.find_all('a'):
+
+        # Get the 'href' attribute of the link
         href = link.get('href')
 
-        #links.append(href)
+        # If the 'href' attribute exists
+        if href:
+            # Use urljoin to combine the base URL and the relative URL
+            abs_url = urljoin(url, href)
 
-        # check relative path
-        if href and (href.startswith('.') or href.startswith('/')):
-            abs_url = url + href
-            # delete fragments
+            # Remove any URL fragment if present
             if "#" in abs_url:
                 abs_url = abs_url.split('#')[0]
-            # check for duplicates
-            if abs_url not in dup and abs_url not in crawled:
-                links.append(abs_url)
-                dup.add(abs_url)
-                crawled.add(abs_url)
-            continue
-        parsed_href = urlparse(href)
-        # Check if the URL is valid
-        ori_parsed = urlparse(url)
-        if parsed_href.scheme and parsed_href.netloc == ori_parsed.netloc:
-            # check for duplicates
-            if href not in dup and href not in crawled:
-                # delete fragments
-                if "#" in href:
-                    href = href.split('#')[0]
-                links.append(href)
-                dup.add(href)
-                crawled.add(href)
-    # print(links)
-    # print(len(links))
-    # exit()
+
+            # Normalize the URL by removing the trailing slash
+            abs_url = abs_url.rstrip('/')
+
+            # Check if the absolute URL has the same domain as the base URL
+            if urlparse(abs_url).netloc == urlparse(url).netloc:
+
+                # Check if the absolute URL is not a duplicate and has not been crawled already
+                if abs_url not in dup:
+                    # Append the absolute URL to the list of extracted links
+                    links.append(abs_url)
+                    # Add the absolute URL to the sets of unique URLs and crawled URLs
+                    dup.add(abs_url)
+    
+
+    print('\n'.join(dup))
+    print(len(dup))
+    exit()
+
+    # Return the list of extracted links
     return links
 
 def is_valid(url):
@@ -97,8 +93,6 @@ def is_valid(url):
     try:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
-            return False
-        if "redirect" in url:
             return False
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
