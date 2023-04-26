@@ -1,4 +1,4 @@
-import re
+import re, time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup 
 import time
@@ -6,7 +6,6 @@ import time
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
 crawled = set()
-
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
