@@ -1,11 +1,17 @@
 import re, time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup 
 import time
+from utils.download import download
+import hashlib
 
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
-crawled = set()
+dup = set()
+fingerprints = set()
+
+OK_counter = 0
+NotOK_counter = 0
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
@@ -38,56 +44,73 @@ def extract_next_links(url, resp):
 
     # Check if the response status is 200 (OK)
     if resp.status != 200:
-        print(1)
+        global NotOK_counter
+        NotOK_counter += 1
+        print("number of page crawed that is bad: ", NotOK_counter)
+        return []
+    else:
+        global OK_counter 
+        OK_counter += 1
+        print("number of page crawed that is ok: ", OK_counter)
+
+    # Check if the content length is within the desired range
+    if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
         return []
 
-    # Check the content length before processing the URL
-    if len(resp.raw_response.content) < MIN_CONTENT_LENGTH:
-        print(2)
-        return []
+    # Initialize a set to store unique URLs
+    dup.add(url)
 
-    # Check the content length before processing the URL
-    if len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
-        print(3)
-        return []
-
-    # check duplicates/infinite loop
-    dup = set(url)
-
+    # Use BeautifulSoup to parse the HTML content
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+
+    text = soup.get_text()
+    # get fingerprint of current page
+    fingerprint = simhash(text)
+    for fp in fingerprints:
+        if is_similar(fp,fingerprint):
+            print("High similarity")
+            return []
+
+    fingerprints.add(fingerprint)
+    # Initialize an empty list to store the extracted links
     links = []
+
+    # Iterate over all 'a' tags in the HTML content
     for link in soup.find_all('a'):
+
+        # Get the 'href' attribute of the link
         href = link.get('href')
 
-        #links.append(href)
+        # If the 'href' attribute exists
+        if href:
+            # Use urljoin to combine the base URL and the relative URL
+            abs_url = urljoin(url, href)
 
-        # check relative path
-        if href and (href.startswith('.') or href.startswith('/')):
-            abs_url = url + href
-            # delete fragments
+            # Remove any URL fragment if present
             if "#" in abs_url:
                 abs_url = abs_url.split('#')[0]
-            # check for duplicates
-            if abs_url not in dup and abs_url not in crawled:
-                links.append(abs_url)
-                dup.add(abs_url)
-                crawled.add(abs_url)
-            continue
-        parsed_href = urlparse(href)
-        # Check if the URL is valid
-        ori_parsed = urlparse(url)
-        if parsed_href.scheme and parsed_href.netloc == ori_parsed.netloc:
-            # check for duplicates
-            if href not in dup and href not in crawled:
-                # delete fragments
-                if "#" in href:
-                    href = href.split('#')[0]
-                links.append(href)
-                dup.add(href)
-                crawled.add(href)
-    # print(links)
-    # print(len(links))
-    # exit()
+
+            # Normalize the URL by removing the trailing slash
+            abs_url = abs_url.rstrip('/')
+            #print(abs_url)
+
+            # Check if the absolute URL has the same domain as the base URL
+            #print(urlparse(url).netloc[3:])
+            #print(re.match(pattern,urlparse(abs_url).netloc))
+            if (urlparse(abs_url).netloc).endswith(urlparse(url).netloc[3:]):
+
+                # Check if the absolute URL is not a duplicate and has not been crawled already
+                if abs_url not in dup:
+                    # Append the absolute URL to the list of extracted links
+                    links.append(abs_url)
+                    # Add the absolute URL to the sets of unique URLs and crawled URLs
+                    dup.add(abs_url)
+    
+    print(len(dup))
+    #print('\n'.join(dup))
+    #print(len(dup))
+    #exit()
+
     return links
 
 def is_valid(url):
@@ -113,3 +136,38 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+def simhash(text):
+    # Count the weight of each token
+    weights = {}
+    for token in text.split():
+        weights[token] = weights.get(token, 0) + 1
+    # Hash the tokens for each token
+    hashes = {}
+    for token, weight in weights.items():
+        hash_value = int(hashlib.sha256(token.encode('utf-8')).hexdigest(), 16)
+        hashes[token] = hash_value
+    # Transfer the hash result to binary for each token
+    binary_hashes = {}
+    for token, hash_value in hashes.items():
+        binary_hashes[token] = bin(hash_value)[2:].zfill(8)
+    # Vector V formed by summing weights
+    V = [0] * 8
+    for token, weight in weights.items():
+        for i in range(8):
+            if binary_hashes[token][i] == '1':
+                V[i] += weight
+            else:
+                V[i] -= weight
+    # 8-bit fingerprint formed from V
+    fingerprint = 0
+    for i in range(8):
+        bit = 1 if V[i] >= 0 else 0
+        fingerprint |= bit << i
+    #print(fingerprint)
+    return fingerprint
+
+def is_similar(fingerprint1, fingerprint2):
+    distance = bin(fingerprint1 ^ fingerprint2).count('1')
+    similarity = 1 - (distance/8)
+    return similarity > 0.97
