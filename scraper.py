@@ -63,13 +63,13 @@ def extract_next_links(url, resp):
         #links.append(href)
 
         # check relative path
-        if href.startswith('.') or href.startswith('/'):
+        if href and (href.startswith('.') or href.startswith('/')):
             abs_url = url + href
             # delete fragments
             if "#" in abs_url:
                 abs_url = abs_url.split('#')[0]
             # check for duplicates
-            if abs_url not in dup and href not in crawled:
+            if abs_url not in dup and abs_url not in crawled:
                 links.append(abs_url)
                 dup.add(abs_url)
                 crawled.add(abs_url)
