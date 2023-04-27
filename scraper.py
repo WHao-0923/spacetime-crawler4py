@@ -1,18 +1,19 @@
-import re, time
+import re, time, tokenize, hashlib, nltk
 from urllib.parse import urlparse, urljoin
-from urllib.parse import urlparse, urljoin
-from bs4 import BeautifulSoup 
-import time
-from utils.download import download
-import hashlib
+from bs4 import BeautifulSoup
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
-dup = set()
-fingerprints = set()
-
 OK_counter = 0
 NotOK_counter = 0
+MAX_word_count = 0
+dup = set()
+fingerprints = set()
+word_frequency_dict = {}
+
+
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
@@ -43,33 +44,39 @@ def extract_next_links(url, resp):
         global NotOK_counter
         NotOK_counter += 1
         print("number of page crawed that is bad: ", NotOK_counter)
-        global NotOK_counter
-        NotOK_counter += 1
-        print("number of page crawed that is bad: ", NotOK_counter)
         return []
-    else:
-        global OK_counter 
-        OK_counter += 1
-        print("number of page crawed that is ok: ", OK_counter)
     else:
         global OK_counter 
         OK_counter += 1
         print("number of page crawed that is ok: ", OK_counter)
 
-    # Check if the content length is within the desired range
-    if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
+
     # Check if the content length is within the desired range
     if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
         return []
+
 
     # Initialize a set to store unique URLs
     dup.add(url)
 
     # Use BeautifulSoup to parse the HTML content
-    # Use BeautifulSoup to parse the HTML content
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
 
+    # Extract the text content of the page
     text = soup.get_text()
+
+    # count the word in this page and update the final frequency dictionary
+    global word_frequency_dict
+    word_count, word_frequency_dict = tokenize_and_count(text, word_frequency_dict)
+    print("word in this page", word_count)
+
+    #update the max word counter
+    global MAX_word_count
+    if word_count > MAX_word_count:
+        MAX_word_count = word_count
+        print("Max word of a page in updated to ", word_count)
+
+
     # get fingerprint of current page
     fingerprint = simhash(text)
     for fp in fingerprints:
@@ -82,11 +89,7 @@ def extract_next_links(url, resp):
     links = []
 
     # Iterate over all 'a' tags in the HTML content
-
-    # Iterate over all 'a' tags in the HTML content
     for link in soup.find_all('a'):
-
-        # Get the 'href' attribute of the link
 
         # Get the 'href' attribute of the link
         href = link.get('href')
@@ -179,3 +182,16 @@ def is_similar(fingerprint1, fingerprint2):
     distance = bin(fingerprint1 ^ fingerprint2).count('1')
     similarity = 1 - (distance/8)
     return similarity > 0.97
+
+def tokenize_and_count_max(text, word_freq):
+    stop_words = set(stopwords.words("english"))
+    #nltk to tokenize the text provided
+    tokens = word_tokenize(text)
+
+    #update the word_frequency dictionary and give the word count of this page
+    for token in tokens:
+        word = token.lower()
+        if word.isalnum() and word not in stop_words:
+            word_freq[word] = word_freq.get(word, 0) + 1
+    
+    return len(tokens), word_freq
