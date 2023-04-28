@@ -3,6 +3,12 @@ from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from utils.count_words import tokenize
+nltk.download('stopwords')
+nltk.download('punkt')
+from collections import defaultdict, Counter
+from crawler.report import Report
+
 
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
@@ -14,9 +20,20 @@ fingerprints = set()
 word_frequency_dict = {}
 
 
+
+
 def scraper(url, resp):
     links = extract_next_links(url, resp)
+    if (urlparse(url).netloc).endswith("ics.uci.edu"):
+        output_file1 = "Logs/subdomain_counts.txt"
+        with open(output_file1, 'w') as f:
+            f.write(f"{urlparse(url).netloc}, {len(links)}\n")
+        # output_file2 = "Logs/word_counts.txt"
+        # with open(output_file2, 'w') as f:
+        #     f.write(f"{}\n")    
+
     return [link for link in links if is_valid(link)]
+
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -43,12 +60,12 @@ def extract_next_links(url, resp):
     if resp.status != 200:
         global NotOK_counter
         NotOK_counter += 1
-        print("number of page crawed that is bad: ", NotOK_counter)
+        print("number of page crawled that is bad: ", NotOK_counter)
         return []
     else:
         global OK_counter 
         OK_counter += 1
-        print("number of page crawed that is ok: ", OK_counter)
+        print("number of page crawled that is ok: ", OK_counter)
 
 
     # Check if the content length is within the desired range
@@ -65,10 +82,11 @@ def extract_next_links(url, resp):
     # Extract the text content of the page
     text = soup.get_text()
 
-    # count the word in this page and update the final frequency dictionary
+    
     global word_frequency_dict
-    word_count, word_frequency_dict = tokenize_and_count(text, word_frequency_dict)
+    word_count, word_frequency_dict = tokenize_and_count_max(text, word_frequency_dict)
     print("word in this page", word_count)
+
 
     #update the max word counter
     global MAX_word_count
@@ -77,14 +95,20 @@ def extract_next_links(url, resp):
         print("Max word of a page in updated to ", word_count)
 
 
-    # get fingerprint of current page
+    # get fingerprint of current page -- XX
     fingerprint = simhash(text)
     for fp in fingerprints:
         if is_similar(fp,fingerprint):
             print("High similarity")
+            OK_counter -= 1
             return []
+    fingerprints.add(fingerprint) 
+    
+    # count the word in this page and update the final frequency dictionary
+    tokenize(url,text)
 
-    fingerprints.add(fingerprint)
+    
+
     # Initialize an empty list to store the extracted links
     links = []
 
@@ -103,13 +127,13 @@ def extract_next_links(url, resp):
             if "#" in abs_url:
                 abs_url = abs_url.split('#')[0]
 
+
             # Normalize the URL by removing the trailing slash
             abs_url = abs_url.rstrip('/')
             #print(abs_url)
+            
 
             # Check if the absolute URL has the same domain as the base URL
-            #print(urlparse(url).netloc[3:])
-            #print(re.match(pattern,urlparse(abs_url).netloc))
             if (urlparse(abs_url).netloc).endswith(urlparse(url).netloc[3:]):
 
                 # Check if the absolute URL is not a duplicate and has not been crawled already
@@ -119,10 +143,12 @@ def extract_next_links(url, resp):
                     # Add the absolute URL to the sets of unique URLs and crawled URLs
                     dup.add(abs_url)
     
-    print(len(dup))
+    #print(len(dup))
     #print('\n'.join(dup))
     #print(len(dup))
     #exit()
+
+    Report.scraped.add(url)
 
     return links
 
@@ -134,7 +160,7 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-        return not re.match(
+        if re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
@@ -142,7 +168,12 @@ def is_valid(url):
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
+            return False
+        if urlparse(url).netloc.endswith('ics.uci.edu'):
+            Report.unique_urls.add(url)
+        return True
+
 
     except TypeError:
         print ("TypeError for ", parsed)
@@ -161,18 +192,18 @@ def simhash(text):
     # Transfer the hash result to binary for each token
     binary_hashes = {}
     for token, hash_value in hashes.items():
-        binary_hashes[token] = bin(hash_value)[2:].zfill(8)
+        binary_hashes[token] = bin(hash_value)[2:].zfill(64)
     # Vector V formed by summing weights
-    V = [0] * 8
+    V = [0] * 64
     for token, weight in weights.items():
-        for i in range(8):
+        for i in range(64):
             if binary_hashes[token][i] == '1':
                 V[i] += weight
             else:
                 V[i] -= weight
-    # 8-bit fingerprint formed from V
+    # 64-bit fingerprint formed from V
     fingerprint = 0
-    for i in range(8):
+    for i in range(64):
         bit = 1 if V[i] >= 0 else 0
         fingerprint |= bit << i
     #print(fingerprint)
@@ -180,8 +211,9 @@ def simhash(text):
 
 def is_similar(fingerprint1, fingerprint2):
     distance = bin(fingerprint1 ^ fingerprint2).count('1')
-    similarity = 1 - (distance/8)
-    return similarity > 0.97
+    similarity = 1 - float(distance/64.0)
+    #print(f"Distance: {distance}, Similarity: {similarity}")
+    return similarity > 0.95
 
 def tokenize_and_count_max(text, word_freq):
     stop_words = set(stopwords.words("english"))
@@ -195,3 +227,4 @@ def tokenize_and_count_max(text, word_freq):
             word_freq[word] = word_freq.get(word, 0) + 1
     
     return len(tokens), word_freq
+
