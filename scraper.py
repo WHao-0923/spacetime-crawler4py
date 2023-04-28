@@ -18,6 +18,7 @@ MAX_word_count = 0
 dup = set()
 fingerprints = set()
 word_frequency_dict = {}
+ics_subdomain_dict = {}
 
 
 
@@ -70,6 +71,7 @@ def extract_next_links(url, resp):
 
     # Check if the content length is within the desired range
     if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
+        OK_counter -= 1
         return []
 
 
@@ -92,7 +94,7 @@ def extract_next_links(url, resp):
     global MAX_word_count
     if word_count > MAX_word_count:
         MAX_word_count = word_count
-        print("Max word of a page in updated to ", word_count)
+        print("Max word of a page is updated to ", word_count)
 
 
     # get fingerprint of current page -- XX
@@ -105,9 +107,13 @@ def extract_next_links(url, resp):
     fingerprints.add(fingerprint) 
     
     # count the word in this page and update the final frequency dictionary
-    tokenize(url,text)
+    # tokenize(url,text)
 
-    
+    if (urlparse(url).netloc[3:] == ".stat.uci.edu"):
+        key = urlparse(url).netloc[:3] + ".stat.uci.edu"
+        global ics_subdomain_dict
+        ics_subdomain_dict[key]  = ics_subdomain_dict.get(key, 0) + 1
+        print(ics_subdomain_dict)
 
     # Initialize an empty list to store the extracted links
     links = []
@@ -134,6 +140,8 @@ def extract_next_links(url, resp):
             
 
             # Check if the absolute URL has the same domain as the base URL
+            
+
             if (urlparse(abs_url).netloc).endswith(urlparse(url).netloc[3:]):
 
                 # Check if the absolute URL is not a duplicate and has not been crawled already
