@@ -5,6 +5,9 @@ from utils.download import download
 from utils import get_logger
 import scraper
 import time
+import os
+
+
 
 
 class Worker(Thread):
@@ -21,7 +24,11 @@ class Worker(Thread):
         while True:
             tbd_url = self.frontier.get_tbd_url()
             if not tbd_url:
+<<<<<<< HEAD
                 self.logger.info("Frontier is empty. Stopping Crawler.")
+=======
+                self.logger.info("Frontier is empty. Stopping Crawler.") 
+>>>>>>> refs/remotes/origin/master
                 with open("myreport", 'r+') as file:
                     file.truncate(0)
                     file.write("Total unique page crawled: " + str(scraper.Total_counter) + "\n")
@@ -41,6 +48,7 @@ class Worker(Thread):
                 print("report initialized in dirctory: \"spacetime-crawler4py\"")
                 print()
                 break
+            
             resp = download(tbd_url, self.config, self.logger)
             self.logger.info(
                 f"Downloaded {tbd_url}, status <{resp.status}>, "
