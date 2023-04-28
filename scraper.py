@@ -13,8 +13,9 @@ from crawler.report import Report
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
 OK_counter = 0
-NotOK_counter = 0
+Total_counter = 0
 MAX_word_count = 0
+MAX_word_count_url = str()
 dup = set()
 fingerprints = set()
 word_frequency_dict = {}
@@ -57,19 +58,23 @@ def extract_next_links(url, resp):
     # Detect and avoid crawling very large files, especially if they have low information value
     
 
+    # Count out the total page
+    global Total_counter
+    Total_counter += 1
+    print("Total page crawed:", Total_counter)
+
     # Check if the response status is 200 (OK)
     if resp.status != 200:
-        global NotOK_counter
-        NotOK_counter += 1
-        print("number of page crawled that is bad: ", NotOK_counter)
+        print("page not OK!")
         return []
     else:
         global OK_counter 
         OK_counter += 1
-        print("number of page crawled that is ok: ", OK_counter)
+        print("number of page crawed that is ok: ", OK_counter)
 
 
     # Check if the content length is within the desired range
+    print("length of the content" , len(resp.raw_response.content))
     if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
         OK_counter -= 1
         return []
@@ -88,13 +93,24 @@ def extract_next_links(url, resp):
     global word_frequency_dict
     word_count, word_frequency_dict = tokenize_and_count_max(text, word_frequency_dict)
     print("word in this page", word_count)
+    print("frequency_dict", word_frequency_dict["research"])
 
 
     #update the max word counter
     global MAX_word_count
     if word_count > MAX_word_count:
+        global MAX_word_count_url
+        MAX_word_count_url = url
         MAX_word_count = word_count
         print("Max word of a page is updated to ", word_count)
+
+
+    # count out subdomains in ".ics.uci.edu"
+    if ("." + ".".join((urlparse(url).netloc.split("."))[1:]) == ".ics.uci.edu"):
+        key =  urlparse(url).scheme + "://" + ".".join((urlparse(url).netloc.split("."))[:1]) + ".ics.uci.edu"
+        global ics_subdomain_dict
+        ics_subdomain_dict[key]  = ics_subdomain_dict.get(key, 0) + 1
+        print(ics_subdomain_dict)
 
 
     # get fingerprint of current page -- XX
@@ -107,13 +123,7 @@ def extract_next_links(url, resp):
     fingerprints.add(fingerprint) 
     
     # count the word in this page and update the final frequency dictionary
-    # tokenize(url,text)
-
-    if (urlparse(url).netloc[3:] == ".stat.uci.edu"):
-        key = urlparse(url).netloc[:3] + ".stat.uci.edu"
-        global ics_subdomain_dict
-        ics_subdomain_dict[key]  = ics_subdomain_dict.get(key, 0) + 1
-        print(ics_subdomain_dict)
+    tokenize(url,text)
 
     # Initialize an empty list to store the extracted links
     links = []
@@ -140,9 +150,7 @@ def extract_next_links(url, resp):
             
 
             # Check if the absolute URL has the same domain as the base URL
-            
-
-            if (urlparse(abs_url).netloc).endswith(urlparse(url).netloc[3:]):
+            if (urlparse(abs_url).netloc).endswith(".".join((urlparse(url).netloc.split("."))[1:])):
 
                 # Check if the absolute URL is not a duplicate and has not been crawled already
                 if abs_url not in dup:
@@ -157,7 +165,7 @@ def extract_next_links(url, resp):
     #exit()
 
     Report.scraped.add(url)
-
+    print()
     return links
 
 def is_valid(url):
