@@ -12,7 +12,12 @@ def main(config_file, restart):
     cparser = ConfigParser()
     cparser.read(config_file)
     config = Config(cparser)
-    config.cache_server = get_cache_server(config, restart)
+    while True:
+        try:
+            config.cache_server = get_cache_server(config, restart)
+            break
+        except:
+            time.sleep(10)
     crawler = Crawler(config, restart)
     crawler.start()
     Report.printReport()

@@ -13,8 +13,9 @@ from crawler.report import Report
 MIN_CONTENT_LENGTH = 500
 MAX_CONTENT_LENGTH = 100000
 OK_counter = 0
-NotOK_counter = 0
+Total_counter = 0
 MAX_word_count = 0
+MAX_word_count_url = str()
 dup = set()
 fingerprints = set()
 word_frequency_dict = {}
@@ -24,10 +25,10 @@ word_frequency_dict = {}
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
-    if (urlparse(url).netloc).endswith("ics.uci.edu"):
-        output_file1 = "Logs/subdomain_counts.txt"
-        with open(output_file1, 'w') as f:
-            f.write(f"{urlparse(url).netloc}, {len(links)}\n")
+    # if (urlparse(url).netloc).endswith("ics.uci.edu"):
+    #     output_file1 = "Logs/subdomain_counts.txt"
+    #     with open(output_file1, 'w') as f:
+    #         f.write(f"{urlparse(url).netloc}, {len(links)}\n")
         # output_file2 = "Logs/word_counts.txt"
         # with open(output_file2, 'w') as f:
         #     f.write(f"{}\n")    
@@ -55,21 +56,28 @@ def extract_next_links(url, resp):
     # Detect and avoid dead URLs that return a 200 status but no data (click here to see what the different HTTP status codes mean Links to an external site.)
     # Detect and avoid crawling very large files, especially if they have low information value
     
+    # Count out the total page
+    global Total_counter
+    Total_counter += 1
+    print("Total page crawed:", Total_counter)
+
 
     # Check if the response status is 200 (OK)
     if resp.status != 200:
-        global NotOK_counter
-        NotOK_counter += 1
-        print("number of page crawled that is bad: ", NotOK_counter)
+        print("page not OK!")
         return []
+    elif resp.status in (301, 302, 303, 307, 308):
+        url = resp.headers.get("Location")
     else:
         global OK_counter 
         OK_counter += 1
-        print("number of page crawled that is ok: ", OK_counter)
+        print("number of page crawed that is ok: ", OK_counter)
 
 
     # Check if the content length is within the desired range
+    #print("length of the content" , len(resp.raw_response.content))
     if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
+        OK_counter -= 1
         return []
 
 
@@ -85,15 +93,24 @@ def extract_next_links(url, resp):
     
     global word_frequency_dict
     word_count, word_frequency_dict = tokenize_and_count_max(text, word_frequency_dict)
-    print("word in this page", word_count)
-
+    #print("word in this page", word_count)
+    #print("frequency_dict", word_frequency_dict["research"])
 
     #update the max word counter
     global MAX_word_count
     if word_count > MAX_word_count:
+        global MAX_word_count_url
+        MAX_word_count_url = url
         MAX_word_count = word_count
-        print("Max word of a page in updated to ", word_count)
+        print("Max word of a page is updated to ", word_count)
 
+
+    # count out subdomains in ".ics.uci.edu"
+    if ("." + ".".join((urlparse(url).netloc.split("."))[1:]) == ".ics.uci.edu"):
+        key =  urlparse(url).scheme + "://" + ".".join((urlparse(url).netloc.split("."))[:1]) + ".ics.uci.edu"
+        global ics_subdomain_dict
+        ics_subdomain_dict[key]  = ics_subdomain_dict.get(key, 0) + 1
+        print(ics_subdomain_dict)
 
     # get fingerprint of current page -- XX
     fingerprint = simhash(text)
@@ -104,7 +121,7 @@ def extract_next_links(url, resp):
             return []
     fingerprints.add(fingerprint) 
     
-    # count the word in this page and update the final frequency dictionary
+    ### count the word in this page and update the final frequency dictionary
     tokenize(url,text)
 
     
@@ -134,8 +151,7 @@ def extract_next_links(url, resp):
             
 
             # Check if the absolute URL has the same domain as the base URL
-            if (urlparse(abs_url).netloc).endswith(urlparse(url).netloc[3:]):
-
+            if (urlparse(abs_url).netloc).endswith(".".join((urlparse(url).netloc.split("."))[1:])):
                 # Check if the absolute URL is not a duplicate and has not been crawled already
                 if abs_url not in dup:
                     # Append the absolute URL to the list of extracted links
@@ -170,7 +186,7 @@ def is_valid(url):
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
             return False
-        if urlparse(url).netloc.endswith('ics.uci.edu'):
+        if urlparse(url).netloc.endswith('.ics.uci.edu'):
             Report.unique_urls.add(url)
         return True
 
@@ -213,7 +229,7 @@ def is_similar(fingerprint1, fingerprint2):
     distance = bin(fingerprint1 ^ fingerprint2).count('1')
     similarity = 1 - float(distance/64.0)
     #print(f"Distance: {distance}, Similarity: {similarity}")
-    return similarity > 0.95
+    return similarity > 0.97
 
 def tokenize_and_count_max(text, word_freq):
     stop_words = set(stopwords.words("english"))
