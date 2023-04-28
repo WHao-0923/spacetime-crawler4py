@@ -63,17 +63,12 @@ def extract_next_links(url, resp):
     print("Total page crawed:", Total_counter)
 
 
-    # Count out the total page
-    global Total_counter
-    Total_counter += 1
-    print("Total page crawed:", Total_counter)
-
     # Check if the response status is 200 (OK)
     if resp.status != 200:
         print("page not OK!")
         return []
     elif resp.status in (301, 302, 303, 307, 308):
-        url = resp.headers.get("Location")
+        url = resp.url
     else:
         global OK_counter 
         OK_counter += 1
@@ -81,11 +76,7 @@ def extract_next_links(url, resp):
 
 
     # Check if the content length is within the desired range
-<<<<<<< HEAD
     #print("length of the content" , len(resp.raw_response.content))
-=======
-    print("length of the content" , len(resp.raw_response.content))
->>>>>>> refs/remotes/origin/master
     if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
         OK_counter -= 1
         return []
@@ -103,14 +94,8 @@ def extract_next_links(url, resp):
     
     global word_frequency_dict
     word_count, word_frequency_dict = tokenize_and_count_max(text, word_frequency_dict)
-<<<<<<< HEAD
     #print("word in this page", word_count)
     #print("frequency_dict", word_frequency_dict["research"])
-=======
-    print("word in this page", word_count)
-    print("frequency_dict", word_frequency_dict["research"])
-
->>>>>>> refs/remotes/origin/master
 
     #update the max word counter
     global MAX_word_count
@@ -119,17 +104,6 @@ def extract_next_links(url, resp):
         MAX_word_count_url = url
         MAX_word_count = word_count
         print("Max word of a page is updated to ", word_count)
-<<<<<<< HEAD
-=======
-
-
-    # count out subdomains in ".ics.uci.edu"
-    if ("." + ".".join((urlparse(url).netloc.split("."))[1:]) == ".ics.uci.edu"):
-        key =  urlparse(url).scheme + "://" + ".".join((urlparse(url).netloc.split("."))[:1]) + ".ics.uci.edu"
-        global ics_subdomain_dict
-        ics_subdomain_dict[key]  = ics_subdomain_dict.get(key, 0) + 1
-        print(ics_subdomain_dict)
->>>>>>> refs/remotes/origin/master
 
 
     # count out subdomains in ".ics.uci.edu"
@@ -177,10 +151,6 @@ def extract_next_links(url, resp):
 
             # Check if the absolute URL has the same domain as the base URL
             if (urlparse(abs_url).netloc).endswith(".".join((urlparse(url).netloc.split("."))[1:])):
-<<<<<<< HEAD
-=======
-
->>>>>>> refs/remotes/origin/master
                 # Check if the absolute URL is not a duplicate and has not been crawled already
                 if abs_url not in dup:
                     # Append the absolute URL to the list of extracted links

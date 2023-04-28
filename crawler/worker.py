@@ -24,11 +24,7 @@ class Worker(Thread):
         while True:
             tbd_url = self.frontier.get_tbd_url()
             if not tbd_url:
-<<<<<<< HEAD
                 self.logger.info("Frontier is empty. Stopping Crawler.")
-=======
-                self.logger.info("Frontier is empty. Stopping Crawler.") 
->>>>>>> refs/remotes/origin/master
                 with open("myreport", 'r+') as file:
                     file.truncate(0)
                     file.write("Total unique page crawled: " + str(scraper.Total_counter) + "\n")
