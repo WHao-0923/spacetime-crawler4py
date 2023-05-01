@@ -12,7 +12,7 @@ class Report:
 
     @staticmethod
     def printReport():
-        f = open("report.txt", "a")
+        f = open("report.txt", "w+")
 
         for word in Report.scraped:
             f.write(word + "\n")

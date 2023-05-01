@@ -25,7 +25,7 @@ class Worker(Thread):
             tbd_url = self.frontier.get_tbd_url()
             if not tbd_url:
                 self.logger.info("Frontier is empty. Stopping Crawler.")
-                with open("myreport", 'r+') as file:
+                with open("myreport.txt", 'w+') as file:
                     file.truncate(0)
                     file.write("Total unique page crawled: " + str(scraper.Total_counter) + "\n")
                     file.write("longest page in terms of the number of words: " + str(scraper.MAX_word_count_url) + " with " + str(scraper.MAX_word_count) + " words\n")

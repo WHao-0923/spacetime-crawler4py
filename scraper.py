@@ -25,15 +25,9 @@ ics_subdomain_dict = {}
 
 
 def scraper(url, resp):
-    links = extract_next_links(url, resp)
-    # if (urlparse(url).netloc).endswith("ics.uci.edu"):
-    #     output_file1 = "Logs/subdomain_counts.txt"
-    #     with open(output_file1, 'w') as f:
-    #         f.write(f"{urlparse(url).netloc}, {len(links)}\n")
-        # output_file2 = "Logs/word_counts.txt"
-        # with open(output_file2, 'w') as f:
-        #     f.write(f"{}\n")    
-
+    if resp.raw_response == None:
+        return []
+    links = extract_next_links(url, resp) 
     return [link for link in links if is_valid(link)]
 
 
@@ -77,6 +71,7 @@ def extract_next_links(url, resp):
 
     # Check if the content length is within the desired range
     #print("length of the content" , len(resp.raw_response.content))
+    
     if len(resp.raw_response.content) < MIN_CONTENT_LENGTH or len(resp.raw_response.content) > MAX_CONTENT_LENGTH:
         OK_counter -= 1
         return []
@@ -128,6 +123,7 @@ def extract_next_links(url, resp):
     # Initialize an empty list to store the extracted links
     links = []
 
+    changed = 0
     # Iterate over all 'a' tags in the HTML content
     for link in soup.find_all('a'):
 
@@ -136,6 +132,7 @@ def extract_next_links(url, resp):
 
         # If the 'href' attribute exists
         if href:
+            changed = 1
             # Use urljoin to combine the base URL and the relative URL
             abs_url = urljoin(url, href)
 
@@ -148,11 +145,12 @@ def extract_next_links(url, resp):
             abs_url = abs_url.rstrip('/')
             #print(abs_url)
             
-
+            
             # Check if the absolute URL has the same domain as the base URL
-            if (urlparse(abs_url).netloc).endswith(".".join((urlparse(url).netloc.split("."))[1:])):
+            #print(urlparse(abs_url).netloc,"."+".".join((urlparse(url).netloc.split("."))[1:]))
+            if (urlparse(abs_url).netloc).endswith("."+".".join((urlparse(url).netloc.split("."))[1:])):
                 # Check if the absolute URL is not a duplicate and has not been crawled already
-                if abs_url not in dup:
+                if abs_url not in dup and abs_url not in Report.scraped:
                     # Append the absolute URL to the list of extracted links
                     links.append(abs_url)
                     # Add the absolute URL to the sets of unique URLs and crawled URLs
@@ -162,8 +160,10 @@ def extract_next_links(url, resp):
     #print('\n'.join(dup))
     #print(len(dup))
     #exit()
-
-    Report.scraped.add(url)
+    if changed:
+        Report.scraped.add(abs_url)
+    else:
+        Report.scraped.add(url)
     print()
     return links
 
@@ -228,7 +228,7 @@ def is_similar(fingerprint1, fingerprint2):
     distance = bin(fingerprint1 ^ fingerprint2).count('1')
     similarity = 1 - float(distance/64.0)
     #print(f"Distance: {distance}, Similarity: {similarity}")
-    return similarity > 0.97
+    return similarity > 0.95
 
 def tokenize_and_count_max(text, word_freq):
     stop_words = set(stopwords.words("english"))
